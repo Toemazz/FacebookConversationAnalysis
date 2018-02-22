@@ -1,6 +1,7 @@
 # https://i.imgur.com/QfbOt87.png
 import math
 import pickle
+import ntpath
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from bs4 import BeautifulSoup
@@ -8,7 +9,7 @@ from datetime import datetime as dt
 from dateutil import relativedelta
 from tqdm import tqdm as tq
 from collections import Counter
-from itertools import groupby
+
 
 plt.style.use('ggplot')
 rcParams.update({'figure.autolayout': True})
@@ -43,13 +44,13 @@ class FacebookConversationAnalysis:
     def save_pickle(data, name):
         with open(name, 'wb') as f:
             pickle.dump(data, f)
-        print('[INFO]: {} saved'.format(name))
+        print('[INFO]: {} saved'.format(ntpath.basename(name)))
 
     # Method: Used to load a 'pickle'
     @staticmethod
     def load_pickle(name):
         with open(name, 'rb') as f:
-            print('[INFO]: {} loaded'.format(name))
+            print('[INFO]: {} loaded'.format(ntpath.basename(name)))
             return pickle.load(f)
 
     # Method: Used to extract message data from Facebook HTML file
@@ -88,6 +89,8 @@ class FacebookConversationAnalysis:
         for i in range(len(unique_users)):
             msgs_percentage = (messages_per_user[i] / self.total_msgs) * 100
             print('[INFO]: Messages sent by {}: {} ({:.2f}%)'.format(unique_users[i], messages_per_user[i], msgs_percentage))
+
+        return unique_users, messages_per_user
 
     # Method: Used to calculate the average number of words per message
     def calculate_average_words_per_message(self, msgs):
@@ -135,23 +138,88 @@ class FacebookConversationAnalysis:
               .format(date, num_msgs, seconds_per_msg))
 
     # Method: Used to plot the total messages per hour
-    def plot_total_msgs_per_hour(self, times, title, x_label, y_label):
-        times = sorted(times)
-        msgs_per_hour, hours = [], []
+    def plot_avg_msgs_per_hour(self, dates, times, save_path='AverageMessagesPerHour.png',
+                               title='Average Messages/Hour', x_label='Hours', y_label='Number of Messages'):
+        delta = dt.strptime(dates[0], self.date_format) - dt.strptime(dates[-1], self.date_format)
 
-        # Group by hour
-        for key, group in groupby(times, key=lambda x: x[:2]):
-            msgs_per_hour.append(len(list(group)))
-            hours.append(key)
+        # Extract the hour from the time
+        hrs = [time[:2] for time in times]
+
+        # Calculate total number of messages per hour
+        hours_freq = dict(Counter(hrs))
+        hours, total_msgs_per_hour = zip(*sorted(hours_freq.items()))
+
+        # Calculate the average number of messages per hour
+        avg_msgs_per_hour = [(hour_msgs / int(delta.days)) for hour_msgs in total_msgs_per_hour]
 
         # Plot number of total messages per hour
-        plt.plot(range(len(msgs_per_hour)), msgs_per_hour)
+        plt.bar(range(len(avg_msgs_per_hour)), avg_msgs_per_hour)
+        for i, avg_msgs in enumerate(avg_msgs_per_hour):
+            plt.text(i-0.5, avg_msgs+1, '{:.1f}'.format(avg_msgs), fontsize='smaller')
         plt.xticks(range(len(hours)), hours)
-        plt.xlim([0, len(hours)-1])
+        plt.xlim([-0.5, len(hours)-0.5])
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.title(title)
+        plt.savefig(save_path)
         plt.show()
+
+    # Method: Used to plot the total messages per hour
+    def plot_avg_msgs_per_weekday(self, dates, save_path='AverageMessagesPerWeekday.png',
+                                  title='Average Messages/Weekday', x_label='Weekday', y_label='Number of Messages'):
+        msgs_per_weekday = [0] * 7
+        weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+        # Get dates and associated times for each day of the week
+        for i in range(len(dates)):
+            date = dt.strptime(dates[i], self.date_format)
+
+            if date.weekday() == 0:
+                msgs_per_weekday[date.weekday()] += 1
+            elif date.weekday() == 1:
+                msgs_per_weekday[date.weekday()] += 1
+            elif date.weekday() == 2:
+                msgs_per_weekday[date.weekday()] += 1
+            elif date.weekday() == 3:
+                msgs_per_weekday[date.weekday()] += 1
+            elif date.weekday() == 4:
+                msgs_per_weekday[date.weekday()] += 1
+            elif date.weekday() == 5:
+                msgs_per_weekday[date.weekday()] += 1
+            else:
+                msgs_per_weekday[date.weekday()] += 1
+
+        avg_msgs_per_weekday = [weekday_msgs / 7 for weekday_msgs in msgs_per_weekday]
+
+        # Plot average number of messages per hour
+        plt.bar(range(len(avg_msgs_per_weekday)), avg_msgs_per_weekday)
+        for i, msgs in enumerate(avg_msgs_per_weekday):
+            plt.text(i-0.25, msgs+2, '{:.1f}'.format(msgs))
+        plt.xticks(range(len(weekdays)), weekdays)
+        plt.xlim([-0.5, len(weekdays)-0.5])
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.title(title)
+        plt.savefig(save_path)
+        plt.show()
+
+    # Method: Used to plot the ratio of total messages sent per user
+    def plot_ratio_of_total_messages_per_user(self, users, save_path='TotalMessagesPerUser.png',
+                                              title='Total Messages/User'):
+        usrs, msgs = self.calculate_total_messages_per_user(users)
+
+        # Pie chart
+        plt.pie(msgs, shadow=True, explode=(0.05, 0.05), autopct='%1.1f%%')
+        plt.legend(labels=usrs, loc="best")
+        plt.axis('equal')
+        plt.title(title)
+        plt.savefig(save_path)
+        plt.show()
+
+    def test(self, dates, times, users, messages):
+        for i, date in enumerate(dates):
+            if date == '28/03/15':
+                print('[{}] {}: {}'.format(times[i], users[i], messages[i]))
 
 
 if __name__ == '__main__':
@@ -172,5 +240,9 @@ if __name__ == '__main__':
     # fb.find_most_active_day(dates)
 
     # Plot some graphs
-    fb.plot_total_msgs_per_hour(times, 'Messages/Hour', 'Hour', '# Messages')
+    # fb.plot_avg_msgs_per_hour(dates, times)
+    # fb.plot_avg_msgs_per_weekday(dates)
+    # fb.plot_ratio_of_total_messages_per_user(users)
+
+    fb.test(dates, times, users, msgs)
 
