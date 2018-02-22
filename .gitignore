@@ -105,3 +105,6 @@ ENV/
 
 # Pickle files
 *.pickle
+
+# JetBrains
+.idea/
