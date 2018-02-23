@@ -142,8 +142,9 @@ class FacebookConversationAnalysis:
               .format(date, num_msgs, seconds_per_msg))
 
     # Method: Used to plot the total messages per hour
-    def plot_avg_msgs_per_hour(self, save_path='AverageMessagesPerHour.png', title='Average Messages/Hour',
-                               x_label='Hours', y_label='Number of Messages'):
+    def plot_average_messages_per_hour(self, save_path='graphs/AverageMessagesPerHour.png',
+                                       title='Average Messages/Hour',
+                                       x_label='Hours', y_label='Number of Messages'):
         delta = dt.strptime(self.dates[0], self.date_format) - dt.strptime(self.dates[-1], self.date_format)
 
         # Extract the hour from the time
@@ -169,8 +170,9 @@ class FacebookConversationAnalysis:
         plt.show()
 
     # Method: Used to plot the total messages per hour
-    def plot_avg_msgs_per_weekday(self, save_path='AverageMessagesPerWeekday.png', title='Average Messages/Weekday',
-                                  x_label='Weekday', y_label='Number of Messages'):
+    def plot_average_messages_per_weekday(self, save_path='graphs/AverageMessagesPerWeekday.png',
+                                          title='Average Messages/Weekday',
+                                          x_label='Weekday', y_label='Number of Messages'):
         msgs_per_weekday = [0] * 7
         weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
@@ -208,7 +210,7 @@ class FacebookConversationAnalysis:
         plt.show()
 
     # Method: Used to plot the ratio of total messages sent per user
-    def plot_ratio_of_total_messages_per_user(self, save_path='TotalMessagesPerUser.png', title='Total Messages/User'):
+    def plot_total_messages_per_user(self, save_path='graphs/TotalMessagesPerUser.png', title='Total Messages/User'):
         usrs, msgs = self.calculate_total_messages_per_user()
         usrs_first_name = [usr.split()[0] for usr in usrs]
 
@@ -221,7 +223,7 @@ class FacebookConversationAnalysis:
         plt.show()
 
     # Method: Used to plot the daily activity over the full time period
-    def plot_activity(self, save_path='Activity.png', title='Total Messages/Day', x_label='Weekday',
+    def plot_activity(self, save_path='graphs/Activity.png', title='Total Messages/Day', x_label='Weekday',
                       y_label='Date'):
         dates = [dt.strptime(date, self.date_format) for date in self.dates]
         dates = [date_dt.strftime('%Y/%m/%d') for date_dt in dates]
@@ -242,7 +244,7 @@ class FacebookConversationAnalysis:
         plt.axhline(y=self.calculate_average_messages_per_unit_time('day'), color='g')
         plt.xticks(range(len(unique_dates)), unique_dates[0::30], rotation=60)
         plt.locator_params(axis='x', nbins=len(unique_dates[0::60]))
-        plt.xlim([-0.5, len(unique_dates) - 0.5])
+        plt.xlim([-0.5, len(unique_dates)-0.5])
         plt.xlabel(x_label)
         plt.ylabel(y_label)
         plt.title(title)
@@ -256,17 +258,17 @@ if __name__ == '__main__':
     fb = FacebookConversationAnalysis('171.html')
 
     # Calculate some statistics
-    fb.calculate_total_messages_per_user()
-    fb.calculate_average_words_per_message()
-    fb.calculate_average_messages_per_unit_time('day')
-    fb.calculate_average_messages_per_unit_time('week')
-    fb.calculate_average_messages_per_unit_time('month')
-    fb.calculate_average_messages_per_unit_time('year')
-    fb.find_most_active_day()
+    # fb.calculate_total_messages_per_user()
+    # fb.calculate_average_words_per_message()
+    # fb.calculate_average_messages_per_unit_time('day')
+    # fb.calculate_average_messages_per_unit_time('week')
+    # fb.calculate_average_messages_per_unit_time('month')
+    # fb.calculate_average_messages_per_unit_time('year')
+    # fb.find_most_active_day()
 
     # Plot some graphs
-    fb.plot_avg_msgs_per_hour()
-    fb.plot_avg_msgs_per_weekday()
-    fb.plot_ratio_of_total_messages_per_user()
+    # fb.plot_average_messages_per_hour()
+    # fb.plot_average_messages_per_weekday()
+    # fb.plot_total_messages_per_user()
     fb.plot_activity()
 
