@@ -2,6 +2,8 @@
 import math
 import pickle
 import ntpath
+import matplotlib
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 from bs4 import BeautifulSoup
@@ -10,7 +12,7 @@ from dateutil import relativedelta
 from tqdm import tqdm as tq
 from collections import Counter
 
-
+matplotlib.use('Qt5Agg')
 plt.style.use('ggplot')
 rcParams.update({'figure.autolayout': True})
 
@@ -26,7 +28,6 @@ class FacebookConversationAnalysis:
                              'pickles/dates.pickle', 'pickles/times.pickle']
 
         if get_data:
-            self.extract_data_from_html_file(html_file)
             data = self.extract_data_from_html_file(html_file)
 
             for n, name in enumerate(pickle_file_names):
@@ -36,8 +37,9 @@ class FacebookConversationAnalysis:
             for name in pickle_file_names:
                 data.append(self.load_pickle(name))
 
-        self.data = data
-        self.total_msgs = len(self.data[0])
+        self.users, self.msgs, self.dates, self.times = data[0], data[1], data[2], data[3]
+
+        self.total_msgs = len(self.msgs)
 
     # Method: Used to 'pickle' a list of data
     @staticmethod
@@ -73,39 +75,41 @@ class FacebookConversationAnalysis:
                 date = str(full_date.strftime(self.date_format))
                 time = str(full_date.strftime(self.time_format))
 
-                users.append(user)
-                msgs.append(msg)
-                dates.append(date)
-                times.append(time)
+                # Ignore 'pictures'
+                if msg != 'None':
+                    users.append(user)
+                    msgs.append(msg)
+                    dates.append(date)
+                    times.append(time)
 
         print('[INFO]: Data extracted from {}'.format(html_file))
         return [users, msgs, dates, times]
 
     # Method: Used to calculate the number of messages by each user
-    def calculate_total_messages_per_user(self, users):
-        msgs_freq = dict(Counter(users))
+    def calculate_total_messages_per_user(self):
+        msgs_freq = dict(Counter(self.users))
         unique_users, messages_per_user = zip(*sorted(msgs_freq.items()))
 
         for i in range(len(unique_users)):
             msgs_percentage = (messages_per_user[i] / self.total_msgs) * 100
-            print('[INFO]: Messages sent by {}: {} ({:.2f}%)'.format(unique_users[i], messages_per_user[i], msgs_percentage))
+            print('[INFO]: Messages sent by {}: {} ({:.1f}%)'.format(unique_users[i], messages_per_user[i], msgs_percentage))
 
         return unique_users, messages_per_user
 
     # Method: Used to calculate the average number of words per message
-    def calculate_average_words_per_message(self, msgs):
+    def calculate_average_words_per_message(self):
         total_words = 0
 
-        for msg in msgs:
+        for msg in self.msgs:
             total_words += len(msg.split())
 
         avg_words_per_msg = float(total_words / self.total_msgs)
         print('[INFO]: Average Words/Message: {:.2f}'.format(avg_words_per_msg))
 
     # Method: Used to calculate the average number of messages per unit time
-    def calculate_average_messages_per_unit_time(self, dates, unit_time='day'):
-        first_date = dt.strptime(dates[-1], self.date_format)
-        last_date = dt.strptime(dates[0], self.date_format)
+    def calculate_average_messages_per_unit_time(self, unit_time='day'):
+        first_date = dt.strptime(self.dates[-1], self.date_format)
+        last_date = dt.strptime(self.dates[0], self.date_format)
 
         delta_dt = last_date - first_date
         delta_du = relativedelta.relativedelta(last_date, first_date)
@@ -122,13 +126,13 @@ class FacebookConversationAnalysis:
             else:
                 interval = delta_du.years
 
-            avg_messages_per_day = float(self.total_msgs / interval)
-            print('[INFO]: Average Messages/{}: {:.2f}'.format(unit_time.title(), avg_messages_per_day))
+            avg_messages_per_unit_time = float(self.total_msgs / interval)
+            print('[INFO]: Average Messages/{}: {:.1f}'.format(unit_time.title(), avg_messages_per_unit_time))
+            return avg_messages_per_unit_time
 
     # Method: Used to find the day with most
-    @staticmethod
-    def find_most_active_day(dates):
-        dates_freq = dict(Counter(dates))
+    def find_most_active_day(self):
+        dates_freq = dict(Counter(self.dates))
 
         date = max(dates_freq, key=dates_freq.get)
         num_msgs = max(dates_freq.values())
@@ -138,12 +142,12 @@ class FacebookConversationAnalysis:
               .format(date, num_msgs, seconds_per_msg))
 
     # Method: Used to plot the total messages per hour
-    def plot_avg_msgs_per_hour(self, dates, times, save_path='AverageMessagesPerHour.png',
-                               title='Average Messages/Hour', x_label='Hours', y_label='Number of Messages'):
-        delta = dt.strptime(dates[0], self.date_format) - dt.strptime(dates[-1], self.date_format)
+    def plot_avg_msgs_per_hour(self, save_path='AverageMessagesPerHour.png', title='Average Messages/Hour',
+                               x_label='Hours', y_label='Number of Messages'):
+        delta = dt.strptime(self.dates[0], self.date_format) - dt.strptime(self.dates[-1], self.date_format)
 
         # Extract the hour from the time
-        hrs = [time[:2] for time in times]
+        hrs = [time[:2] for time in self.times]
 
         # Calculate total number of messages per hour
         hours_freq = dict(Counter(hrs))
@@ -165,14 +169,14 @@ class FacebookConversationAnalysis:
         plt.show()
 
     # Method: Used to plot the total messages per hour
-    def plot_avg_msgs_per_weekday(self, dates, save_path='AverageMessagesPerWeekday.png',
-                                  title='Average Messages/Weekday', x_label='Weekday', y_label='Number of Messages'):
+    def plot_avg_msgs_per_weekday(self, save_path='AverageMessagesPerWeekday.png', title='Average Messages/Weekday',
+                                  x_label='Weekday', y_label='Number of Messages'):
         msgs_per_weekday = [0] * 7
         weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
         # Get dates and associated times for each day of the week
-        for i in range(len(dates)):
-            date = dt.strptime(dates[i], self.date_format)
+        for i in range(len(self.dates)):
+            date = dt.strptime(self.dates[i], self.date_format)
 
             if date.weekday() == 0:
                 msgs_per_weekday[date.weekday()] += 1
@@ -204,45 +208,65 @@ class FacebookConversationAnalysis:
         plt.show()
 
     # Method: Used to plot the ratio of total messages sent per user
-    def plot_ratio_of_total_messages_per_user(self, users, save_path='TotalMessagesPerUser.png',
-                                              title='Total Messages/User'):
-        usrs, msgs = self.calculate_total_messages_per_user(users)
+    def plot_ratio_of_total_messages_per_user(self, save_path='TotalMessagesPerUser.png', title='Total Messages/User'):
+        usrs, msgs = self.calculate_total_messages_per_user()
+        usrs_first_name = [usr.split()[0] for usr in usrs]
 
         # Pie chart
         plt.pie(msgs, shadow=True, explode=(0.05, 0.05), autopct='%1.1f%%')
-        plt.legend(labels=usrs, loc="best")
+        plt.legend(labels=usrs_first_name, loc="best")
         plt.axis('equal')
         plt.title(title)
         plt.savefig(save_path)
         plt.show()
 
-    def test(self, dates, times, users, messages):
-        for i, date in enumerate(dates):
-            if date == '28/03/15':
-                print('[{}] {}: {}'.format(times[i], users[i], messages[i]))
+    # Method: Used to plot the daily activity over the full time period
+    def plot_activity(self, save_path='Activity.png', title='Total Messages/Day', x_label='Weekday',
+                      y_label='Date'):
+        dates = [dt.strptime(date, self.date_format) for date in self.dates]
+        dates = [date_dt.strftime('%Y/%m/%d') for date_dt in dates]
+        dates = sorted(dates, key=lambda x: dt.strptime(x, '%Y/%m/%d'))
+
+        dates_freq = dict(Counter(dates))
+        unique_dates, msgs_per_date = zip(*sorted(dates_freq.items()))
+
+        unique_dates = [date[:7] for date in unique_dates]
+
+        def moving_average(interval, window_size):
+            window = np.ones(int(window_size)) / float(window_size)
+            return np.convolve(interval, window, 'same')
+
+        # Plot average number of messages per hour
+        plt.plot(range(len(msgs_per_date)), msgs_per_date)
+        plt.plot(range(len(msgs_per_date)), moving_average(msgs_per_date, 30))
+        plt.axhline(y=self.calculate_average_messages_per_unit_time('day'), color='g')
+        plt.xticks(range(len(unique_dates)), unique_dates[0::30], rotation=60)
+        plt.locator_params(axis='x', nbins=len(unique_dates[0::60]))
+        plt.xlim([-0.5, len(unique_dates) - 0.5])
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.title(title)
+        plt.legend(labels=['Daily Total', 'Rolling Average', 'Average'], loc='best')
+        plt.savefig(save_path)
+        plt.show()
 
 
 if __name__ == '__main__':
     # Create instance and get data
     fb = FacebookConversationAnalysis('171.html')
-    fb_data = fb.data
-
-    # Split data
-    users, msgs, dates, times = fb_data[0], fb_data[1], fb_data[2], fb_data[3]
 
     # Calculate some statistics
-    # fb.calculate_total_messages_per_user(users)
-    # fb.calculate_average_words_per_message(msgs)
-    # fb.calculate_average_messages_per_unit_time(dates, 'day')
-    # fb.calculate_average_messages_per_unit_time(dates, 'week')
-    # fb.calculate_average_messages_per_unit_time(dates, 'month')
-    # fb.calculate_average_messages_per_unit_time(dates, 'year')
-    # fb.find_most_active_day(dates)
+    fb.calculate_total_messages_per_user()
+    fb.calculate_average_words_per_message()
+    fb.calculate_average_messages_per_unit_time('day')
+    fb.calculate_average_messages_per_unit_time('week')
+    fb.calculate_average_messages_per_unit_time('month')
+    fb.calculate_average_messages_per_unit_time('year')
+    fb.find_most_active_day()
 
     # Plot some graphs
-    # fb.plot_avg_msgs_per_hour(dates, times)
-    # fb.plot_avg_msgs_per_weekday(dates)
-    # fb.plot_ratio_of_total_messages_per_user(users)
-
-    fb.test(dates, times, users, msgs)
+    fb.plot_avg_msgs_per_hour()
+    fb.plot_avg_msgs_per_weekday()
+    fb.plot_ratio_of_total_messages_per_user()
+    fb.plot_activity()
 
